@@ -1,0 +1,175 @@
+---
+title: "GLMNET MINT"
+author: "Felix Leborgne"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    theme: united
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, results = "hold", cache=TRUE}
+library(glmnet)
+library(dplyr)
+library(caret)
+library(tidyverse)
+library(pROC)
+library(smotefamily)
+```
+
+## 1. Dataset pre-processing
+We will proceed to clean the dataset (remove unneesary columns) and process it. Numerical columns will be standardized and binomial categorical columns will be encoded with a 1 and 0. The function $makeX()$ does One Hot Encoding and imputes the missing values.
+```{r data processing, cache=TRUE}
+# Import dataset
+data <- read.csv("data/telco_churn_data.csv")
+
+set.seed(1)
+
+# Reove unnecesary columns
+data <- subset(data, select = -c(Customer.Satisfaction, City, Customer.ID, 
+                                 Churn.Category, Churn.Reason, Population, Latitude,
+                                 Longitude, Under.30, Senior.Citizen))
+
+# Separate numerical and categorical features
+numerical_columns <- data %>% select_if(is.numeric)
+categorical_columns <- data[ ,sapply(data, is.character)]
+
+# Encoding binary categorical variables
+for (col in names(data)) {
+  if (nrow(unique(data[col])) == 2){
+    data[,col] <- as.numeric(factor(data[,col]))-1    # The -1 is to transform (2,1) to (1,0)
+  }
+}
+
+# Scale numerical features
+numerical_columns <- subset(numerical_columns, select = -Churn.Value)
+data[names(numerical_columns)] <- scale(data[names(numerical_columns)])
+
+# Does one hot encoding and imputes missing values
+data <- makeX(data)
+
+# Train and test split
+row_split <- sample(1:nrow(data), 0.75 * nrow(data))
+X_train <- data[row_split,] %>% subset(select = -Churn.Value)
+X_test <- data[-row_split,] %>% subset(select = -Churn.Value)
+y_train <- data[row_split, "Churn.Value"]
+y_test <- data[-row_split, "Churn.Value"]
+
+# Apply SMOTE sampling to address class imbalance on the train dataset
+#dup_size <- sum(data[,"Churn.Value"]) / nrow(data)          # Amount of undersampling
+#balanced_data <- SMOTE(X_train, y_train)
+```
+
+## 2. Train Models
+First, we will train Lasso and Ridge regularizations and compare the models. Afterwards, we will train an Elastic Net with 10 alphas to compare all the models in between Ridge and Lasso. Finally, we will evaluate the model with the highest accuracy score and compare it to the Logistic Regression we already made in Python.
+
+### 2.1. Lasso Regularization
+```{r lasso, cache=TRUE}
+set.seed(1)
+
+# Fit the model
+lasso.fit <- cv.glmnet(X_train, y_train, alpha=1, family="binomial")
+
+# Predict values
+lasso.predicted <- predict(lasso.fit, s=lasso.fit$lambda.1se, newx=X_test)
+lasso.classes <- ifelse(lasso.predicted > 0.5, 1, 0) %>% as.numeric()
+
+# Accuracy of model
+print(paste("Model accuracy =", mean(y_test == lasso.classes)))
+
+# Show the largest coefficients
+coefsl <- coef(lasso.fit, lasso.fit$lambda.1se)
+coefsl[,1][order(-abs(coefsl[,1]))][2:9] 
+
+# Plot lasso
+plot(lasso.fit)
+```
+
+
+### 2.2. Ridge Regularization
+```{r ridge, cache=TRUE}
+set.seed(1)
+
+# Fit the model
+ridge.fit <- cv.glmnet(X_train, y_train, alpha=0, family="binomial")
+
+# Predict values
+ridge.predicted <- predict(ridge.fit, s=ridge.fit$lambda.1se, newx=X_test)
+ridge.classes <- ifelse(ridge.predicted > 0.5, 1, 0)
+
+# Accuracy of model
+print(paste("Model accuracy =", mean(y_test == ridge.classes)))
+
+# Show the largest coefficients
+coefsl <- coef(ridge.fit, ridge.fit$lambda.1se)
+coefsl[,1][order(-abs(coefsl[,1]))][2:9] 
+
+# Plot lasso
+plot(ridge.fit)
+```
+
+
+### 2.3. Elastic Net
+```{r elastic net, cache=TRUE}
+# Elastic Net (changing alpha)
+set.seed(1)
+
+# Create a list of fits for alphas 0 to 1 increasing in 0.1
+list_fits <- list()
+for (i in 0:10) {
+  fit_name <- paste0("alpha", i/10)
+  list_fits[[fit_name]] <-
+    cv.glmnet(X_train, y_train, alpha=i/10, family="binomial")
+}
+
+# Create a data frame with the results of the predictions and their accuracy
+results <- data.frame()
+for (i in 0:10) {
+  fit_name <- paste0("alpha", i/10)
+  predicted <- predict(list_fits[[fit_name]], s=list_fits[[fit_name]]$lambda.1se, newx=X_test)
+  predicted.classes <- ifelse(predicted > 0.5, 1, 0)
+  accuracy <- mean(y_test == predicted.classes)
+  temp <- data.frame(alpha=i/10, accuracy=accuracy, fit_name=fit_name)
+  results <- rbind(results, temp)
+}
+
+print(results)
+```
+
+As we can see, all the models from $alpha=0.2$ onwards have basically the same accuracy equal to $0.906$. For this reason, we will use the simpler $alpha=1$ Lasso regression, which will help us determine which features are the most significant in predicting churn.
+
+## 3. Model Evaluation
+```{r evaluation, cache=TRUE, warning=FALSE}
+# Accuracy of model
+print(paste("Model accuracy =", mean(y_test == lasso.classes)))
+
+# Show the largest coefficients
+coefsl <- coef(lasso.fit, lasso.fit$lambda.1se)
+print(coefsl[,1][order(-abs(coefsl[,1]))][2:9])
+
+# Plot lasso
+plot(lasso.fit)
+
+# Plot a ROC curve
+roc_curve <- roc(y_test, lasso.predicted)
+plot(roc_curve, main = "ROC Curve", print.auc = TRUE)
+
+# Create a confusion matrix
+confusion_matrix <- confusionMatrix(factor(as.vector(lasso.classes)), factor(y_test))
+
+# Print the confusion matrix
+print(confusion_matrix)
+
+# F1, Precision and Recall metrics
+classification_report <- confusion_matrix$byClass
+print(classification_report[5:7])
+
+```
+
+The AUC of the ROC graph in this model is $0.957$, which is better than the AUC of normal Logistic regression of $0.93$. 
+
+In the lasso curve we can see that the minimum cross validation error is on 42 features, but taking 1 standard deviation, the amount of non-zero features drops to 30. The 8 most important featurs are printed above. 
