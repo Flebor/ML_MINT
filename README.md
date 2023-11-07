@@ -2,6 +2,9 @@
 
 # Customer Churn Prediction
 
+![pic](./data/teleco.jpg)
+
+
 ## Introduction
 In today's highly competitive telecommunications industry, retaining customers is a top priority for businesses. Customer churn, also known as attrition, can significantly impact a company's revenue and market share. Leveraging data and machine learning techniques can provide valuable insights into predicting and addressing churn effectively.
 
