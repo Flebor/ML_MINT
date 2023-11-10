@@ -16,7 +16,7 @@ In today's highly competitive telecommunications industry, retaining customers i
 
 This project focuses on churn prediction using a telecom dataset. We will start by conducting an in-depth exploratory data analysis (EDA) to gain insights into the key factors influencing customer churn. Subsequently, we will apply various machine learning models, including logistic regression, XGBoosting and glmnet for predictive analysis. Our goal is to equip telecom companies with actionable insights and predictive tools to help them reduce churn and enhance customer retention.
 
-You will find detailed code and analysis, in the Jupyter notebook named "ChurnPred" as well as the Rmd "GLMNET" which explains the glmnet model donde in R.
+You will find detailed code and analysis, in the Jupyter notebook named "ChurnPred" as well as the Rmd "GLMNET" which explains the glmnet model done in R (there were many online resources for glmnet in R).
 For each of the Machine Learning models we have applied different data preprocessing techniques to adjust the data depending on the model and it´s characteristics.
 
 ## 2. Methodology
@@ -42,4 +42,4 @@ Through the methodologies presented, telecom companies can gain valuable insight
 
 _**Note:** The code for this project can be found in the "churn_pred" Jupyter notebook and GLMNET.Rmd._
 
-Feel free to explore the code and analyses in the notebook for a deeper understanding of the project.
+Feel free to explore the code and analysis in the notebook for a deeper understanding of the project.
