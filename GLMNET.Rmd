@@ -1,11 +1,13 @@
 ---
 title: "GLMNET MINT"
-author: "Felix Leborgne"
+author: "Felix Leborgne, Carolina Rivero y Santiago Escobar"
 date: "`r Sys.Date()`"
-output:
+output: 
   html_document:
-    df_print: paged
     theme: united
+    toc: yes
+    toc_float:
+      collapsed: true
 ---
 
 ```{r setup, include=FALSE}
@@ -18,7 +20,6 @@ library(dplyr)
 library(caret)
 library(tidyverse)
 library(pROC)
-library(smotefamily)
 ```
 
 ## 1. Dataset pre-processing
@@ -58,10 +59,6 @@ X_train <- data[row_split,] %>% subset(select = -Churn.Value)
 X_test <- data[-row_split,] %>% subset(select = -Churn.Value)
 y_train <- data[row_split, "Churn.Value"]
 y_test <- data[-row_split, "Churn.Value"]
-
-# Apply SMOTE sampling to address class imbalance on the train dataset
-#dup_size <- sum(data[,"Churn.Value"]) / nrow(data)          # Amount of undersampling
-#balanced_data <- SMOTE(X_train, y_train)
 ```
 
 ## 2. Train Models
